@@ -52,36 +52,40 @@ export function createPoseRitualController({
   async function predictLoop() {
     if (!webcamRunning || !model || !webcam) return;
 
-    webcam.update();
+    try {
+      webcam.update();
 
-    const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
-    const predictions = await model.predict(posenetOutput);
-    const best = getBestPrediction(predictions);
+      const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
+      const predictions = await model.predict(posenetOutput);
+      const best = getBestPrediction(predictions);
 
-    if (best && DEBUG) {
-      console.log(
-        "gesture:",
-        best.className,
-        "probability:",
-        best.probability.toFixed(2),
-      );
-    }
+      if (best) {
+        const rawName = best.className;
+        const gesture = rawName.trim().toLowerCase();
+        const probability = best.probability;
 
-    if (best && best.probability > CONFIDENCE_THRESHOLD) {
-      const gesture = best.className.trim().toLowerCase();
+        console.log("TM prediction:", rawName, gesture, probability.toFixed(2));
 
-      state.currentGesture = gesture;
-      state.lastGestureTime = performance.now();
+        if (probability > CONFIDENCE_THRESHOLD) {
+          state.currentGesture = gesture;
+          state.lastGestureTime = performance.now();
 
-      onGesture?.(
-        gesture,
-        {
-          pose,
-          predictions,
-          best,
-        },
-        state,
-      );
+          onGesture?.(
+            gesture,
+            {
+              pose,
+              predictions,
+              best,
+            },
+            state,
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Prediction loop failed:", error);
+      onError?.(error);
+      webcamRunning = false;
+      return;
     }
 
     requestAnimationFrame(predictLoop);

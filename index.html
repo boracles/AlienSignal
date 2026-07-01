@@ -269,12 +269,11 @@
     <div class="scanline"></div>
     <div class="vignette"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/pose@latest/dist/teachablemachine-pose.min.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/pose@0.8/dist/teachablemachine-pose.min.js"></script>
     <script type="module">
       import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-      import { createPoseRitualController } from "./js/pose.js?v=4";
+      import { createPoseRitualController } from "./js/pose.js?v=10";
 
       const floorText = document.getElementById("floorText");
       const depthProgress = document.getElementById("depthProgress");
@@ -953,6 +952,8 @@
 
           currentGesture = gesture;
           lastGestureTime = performance.now();
+
+          ritualMessage = `감지된 동작: ${gesture}`;
 
           applyGestureToStairRitual(gesture);
         },

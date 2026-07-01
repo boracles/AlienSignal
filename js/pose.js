@@ -1,4 +1,4 @@
-const MODEL_URL = "https://teachablemachine.withgoogle.com/models/XXXXXXXXX/";
+const MODEL_URL = "https://teachablemachine.withgoogle.com/models/cLtqsj5MG/";
 
 export function createPoseRitualController({
   onGesture,

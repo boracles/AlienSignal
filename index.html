@@ -261,6 +261,10 @@
     </div>
 
     <button class="sound-button" id="soundButton">sound on</button>
+    <button class="sound-button" id="poseButton" style="right: 130px">
+      ritual on
+    </button>
+
     <div class="grain"></div>
     <div class="scanline"></div>
     <div class="vignette"></div>
@@ -268,10 +272,13 @@
     <script type="module">
       import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
 
+      import { createPoseRitualController } from "./js/pose.js";
+
       const floorText = document.getElementById("floorText");
       const depthProgress = document.getElementById("depthProgress");
       const caption = document.getElementById("caption");
       const soundButton = document.getElementById("soundButton");
+      const poseButton = document.getElementById("poseButton");
 
       // ------------------------------------------------------------
       // Scene / Camera / Renderer
@@ -910,6 +917,104 @@
       let lastY = 0;
       let isDragging = false;
 
+      let ritualUnlocked = false;
+      let stairSatisfaction = 0;
+      let stairBoredom = 100;
+
+      let currentGesture = "none";
+      let lastGestureTime = 0;
+      let poseReady = false;
+
+      let gestureCooldown = {
+        bow: 0,
+        handRaised: 0,
+        sway: 0,
+        stillness: 0,
+        chaotic: 0,
+        clapOrStamp: 0,
+      };
+
+      let stairSoundState = "sleeping";
+      let ritualMessage = "";
+      let signalBoostFromRitual = 0;
+
+      const poseRitual = createPoseRitualController({
+        onReady: () => {
+          poseReady = true;
+          ritualMessage = "계단이 당신의 움직임을 감지하기 시작했다.";
+        },
+
+        onGesture: (gesture) => {
+          currentGesture = gesture;
+          lastGestureTime = performance.now();
+
+          applyGestureToStairRitual(gesture);
+        },
+
+        onError: (error) => {
+          console.warn("Pose detection failed:", error);
+          ritualMessage =
+            "카메라 접근이 허용되지 않아 계단 의식이 잠들어 있다.";
+        },
+      });
+
+      poseButton.addEventListener("click", async () => {
+        poseButton.textContent = "ritual loading";
+
+        const success = await poseRitual.init();
+
+        if (success) {
+          poseButton.textContent = "ritual on";
+          poseButton.classList.add("active");
+        } else {
+          poseButton.textContent = "ritual failed";
+          poseButton.classList.remove("active");
+        }
+      });
+
+      function applyGestureToStairRitual(gesture) {
+        const now = performance.now();
+
+        if (gestureCooldown[gesture] && now - gestureCooldown[gesture] < 1200) {
+          return;
+        }
+
+        gestureCooldown[gesture] = now;
+
+        if (gesture === "bow") {
+          stairSatisfaction += 18;
+          stairBoredom -= 16;
+          signalBoostFromRitual += 0.08;
+          stairSoundState = "pleased";
+          ritualMessage = "계단은 고개 숙임을 오래된 인사로 받아들인다.";
+        }
+
+        if (gesture === "handRaised") {
+          stairSatisfaction += 12;
+          stairBoredom -= 10;
+          signalBoostFromRitual += 0.05;
+          stairSoundState = "listening";
+          ritualMessage = "계단은 들어 올린 손을 호출 신호로 인식한다.";
+        }
+
+        if (gesture === "stillness") {
+          stairSatisfaction += 4;
+          stairBoredom -= 3;
+          signalBoostFromRitual += 0.015;
+          stairSoundState = "breathing";
+          ritualMessage = "가만히 멈춘 몸이 계단의 호흡과 맞춰진다.";
+        }
+
+        stairSatisfaction = clamp(stairSatisfaction, 0, 100);
+        stairBoredom = clamp(stairBoredom, 0, 100);
+        signalBoostFromRitual = clamp(signalBoostFromRitual, 0, 1);
+
+        if (stairSatisfaction >= 70 && stairBoredom <= 35) {
+          ritualUnlocked = true;
+          ritualMessage = "계단이 충분히 달래졌다. 엘리베이터가 응답한다.";
+        }
+      }
+
       const captions = [
         "나는 이미 108계단의 위쪽에 서 있다. 아래 깊은 곳에서 유리 엘리베이터가 작은 점처럼 보인다.",
         "드래그하면 엘리베이터가 경사 레일을 타고 나를 향해 천천히 올라오기 시작한다.",
@@ -1130,6 +1235,9 @@
 
         const time = clock.getElapsedTime();
 
+        const ritualPull = ritualUnlocked ? 0.0035 : 0;
+        target = clamp(target + ritualPull, 0.02, MAX_APPROACH);
+
         progress += (target - progress) * 0.075;
 
         const movement = clamp(Math.abs(velocity) / 34, 0, 1);
@@ -1182,8 +1290,11 @@
         camera.lookAt(lookAtCabin);
 
         // 외계 신호는 위로 갈수록 강해짐
-        const signalIntensity = map(progress, 0, 1, 0.15, 1.0);
+        const signalIntensity =
+          map(progress, 0, 1, 0.15, 1.0) + signalBoostFromRitual * 0.8;
+
         alienLight.intensity = 1.1 + signalIntensity * 3.2;
+
         alienLight.position.z = map(progress, 0, 1, -15, -58);
         alienLight.position.y = map(progress, 0, 1, 3.5, 11.5);
 
@@ -1208,7 +1319,7 @@
           captions.length - 1,
         );
 
-        caption.textContent = captions[captionIndex];
+        caption.textContent = ritualMessage || captions[captionIndex];
 
         updateSound(movement);
 

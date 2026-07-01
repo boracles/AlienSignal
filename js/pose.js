@@ -13,6 +13,9 @@ export function createPoseRitualController({
   let webcamRunning = false;
   let lastVideoTime = -1;
 
+  let previousShoulderX = null;
+  let swayHistory = [];
+
   const state = {
     poseReady: false,
     currentGesture: "none",
@@ -111,25 +114,85 @@ export function createPoseRitualController({
     const rightShoulder = landmarks[12];
     const leftWrist = landmarks[15];
     const rightWrist = landmarks[16];
+    const leftHip = landmarks[23];
+    const rightHip = landmarks[24];
 
-    if (!nose || !leftShoulder || !rightShoulder || !leftWrist || !rightWrist) {
+    if (
+      !nose ||
+      !leftShoulder ||
+      !rightShoulder ||
+      !leftWrist ||
+      !rightWrist ||
+      !leftHip ||
+      !rightHip
+    ) {
       return "none";
     }
 
-    const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
-    const wristY = Math.min(leftWrist.y, rightWrist.y);
+    const now = performance.now() / 1000;
 
-    // 손을 어깨보다 높게 들면 handRaised
-    if (wristY < shoulderY - 0.08) {
+    const shoulderX = (leftShoulder.x + rightShoulder.x) / 2;
+    const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+    const hipY = (leftHip.y + rightHip.y) / 2;
+
+    const torsoLength = Math.abs(hipY - shoulderY);
+    const headToShoulder = nose.y - shoulderY;
+
+    const leftHandRaised = leftWrist.y < leftShoulder.y - 0.08;
+    const rightHandRaised = rightWrist.y < rightShoulder.y - 0.08;
+    const bothHandsRaised = leftHandRaised && rightHandRaised;
+
+    const bowing = headToShoulder > torsoLength * 0.12;
+    const swaying = detectSway(shoulderX, now);
+    const standingStill = detectStillness(shoulderX);
+
+    if (bothHandsRaised) {
+      return "offering";
+    }
+
+    if (leftHandRaised || rightHandRaised) {
       return "handRaised";
     }
 
-    // 고개/상체가 어깨선보다 많이 아래로 내려가면 bow
-    if (nose.y > shoulderY - 0.02) {
+    if (bowing) {
       return "bow";
     }
 
-    return "stillness";
+    if (swaying) {
+      return "sway";
+    }
+
+    if (standingStill) {
+      return "stillness";
+    }
+
+    return "none";
+  }
+
+  function detectSway(shoulderX, time) {
+    swayHistory.push({ x: shoulderX, t: time });
+
+    swayHistory = swayHistory.filter((item) => time - item.t < 1.6);
+
+    if (swayHistory.length < 8) return false;
+
+    const xs = swayHistory.map((item) => item.x);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+
+    return maxX - minX > 0.08;
+  }
+
+  function detectStillness(shoulderX) {
+    if (previousShoulderX === null) {
+      previousShoulderX = shoulderX;
+      return false;
+    }
+
+    const movement = Math.abs(shoulderX - previousShoulderX);
+    previousShoulderX = shoulderX;
+
+    return movement < 0.002;
   }
 
   function getState() {

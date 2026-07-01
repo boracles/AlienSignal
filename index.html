@@ -928,6 +928,7 @@
       let gestureCooldown = {
         bow: 0,
         handRaised: 0,
+        offering: 0,
         sway: 0,
         stillness: 0,
         chaotic: 0,
@@ -995,6 +996,24 @@
           signalBoostFromRitual += 0.05;
           stairSoundState = "listening";
           ritualMessage = "계단은 들어 올린 손을 호출 신호로 인식한다.";
+        }
+
+        if (gesture === "offering") {
+          stairSatisfaction += 24;
+          stairBoredom -= 22;
+          signalBoostFromRitual += 0.12;
+          stairSoundState = "blessed";
+          ritualMessage =
+            "계단은 두 손을 들어 올린 몸짓을 제물의 봉헌으로 받아들인다.";
+        }
+
+        if (gesture === "sway") {
+          stairSatisfaction += 10;
+          stairBoredom -= 12;
+          signalBoostFromRitual += 0.04;
+          stairSoundState = "swaying";
+          ritualMessage =
+            "계단은 좌우로 흔들리는 몸을 오래된 춤의 신호로 받아들인다.";
         }
 
         if (gesture === "stillness") {

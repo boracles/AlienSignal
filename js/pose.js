@@ -1,4 +1,4 @@
-const MODEL_URL = "여기에_티처블머신_MODEL_URL_붙이기/";
+const MODEL_URL = "https://teachablemachine.withgoogle.com/models/XXXXXXXXX/";
 
 export function createPoseRitualController({
   onGesture,

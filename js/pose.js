@@ -55,14 +55,24 @@ export function createPoseRitualController({
 
     const best = getBestPrediction(predictions);
 
-    if (best && best.probability > 0.75) {
-      const gesture = best.className;
+    // 디버그용: 브라우저 Console에서 현재 무엇으로 인식되는지 확인
+    if (best) {
+      console.log(
+        "gesture:",
+        best.className,
+        "probability:",
+        best.probability.toFixed(2),
+      );
+    }
 
-      if (gesture !== state.currentGesture) {
-        state.currentGesture = gesture;
-        state.lastGestureTime = performance.now();
-        onGesture?.(gesture, { pose, predictions }, state);
-      }
+    // 테스트 단계에서는 0.75가 높을 수 있으므로 0.55 정도로 낮춤
+    if (best && best.probability > 0.55) {
+      const gesture = best.className.trim().toLowerCase();
+
+      state.currentGesture = gesture;
+      state.lastGestureTime = performance.now();
+
+      onGesture?.(gesture, { pose, predictions }, state);
     }
 
     requestAnimationFrame(predictLoop);

@@ -10,6 +10,9 @@ export function createPoseRitualController({
   let webcamRunning = false;
   let maxPredictions = 0;
 
+  const DEBUG = true;
+  const CONFIDENCE_THRESHOLD = 0.55;
+
   const state = {
     poseReady: false,
     currentGesture: "none",
@@ -28,6 +31,7 @@ export function createPoseRitualController({
 
       const flip = true;
       webcam = new tmPose.Webcam(640, 480, flip);
+
       await webcam.setup();
       await webcam.play();
 
@@ -39,7 +43,7 @@ export function createPoseRitualController({
 
       return true;
     } catch (error) {
-      console.error(error);
+      console.error("Teachable Machine pose init failed:", error);
       onError?.(error);
       return false;
     }
@@ -52,11 +56,9 @@ export function createPoseRitualController({
 
     const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
     const predictions = await model.predict(posenetOutput);
-
     const best = getBestPrediction(predictions);
 
-    // 디버그용: 브라우저 Console에서 현재 무엇으로 인식되는지 확인
-    if (best) {
+    if (best && DEBUG) {
       console.log(
         "gesture:",
         best.className,
@@ -65,14 +67,21 @@ export function createPoseRitualController({
       );
     }
 
-    // 테스트 단계에서는 0.75가 높을 수 있으므로 0.55 정도로 낮춤
-    if (best && best.probability > 0.55) {
+    if (best && best.probability > CONFIDENCE_THRESHOLD) {
       const gesture = best.className.trim().toLowerCase();
 
       state.currentGesture = gesture;
       state.lastGestureTime = performance.now();
 
-      onGesture?.(gesture, { pose, predictions }, state);
+      onGesture?.(
+        gesture,
+        {
+          pose,
+          predictions,
+          best,
+        },
+        state,
+      );
     }
 
     requestAnimationFrame(predictLoop);
@@ -92,6 +101,8 @@ export function createPoseRitualController({
 
   function stop() {
     webcamRunning = false;
+    state.poseReady = false;
+    state.currentGesture = "none";
 
     if (webcam?.webcam?.srcObject) {
       webcam.webcam.srcObject.getTracks().forEach((track) => track.stop());

@@ -920,6 +920,7 @@
       let isDragging = false;
 
       let ritualUnlocked = false;
+      let elevatorSummoning = false;
       let stairSatisfaction = 0;
       let stairBoredom = 100;
 
@@ -948,8 +949,12 @@
         },
 
         onGesture: (gesture) => {
+          console.log("received gesture in index:", gesture);
+
           currentGesture = gesture;
           lastGestureTime = performance.now();
+
+          caption.textContent = `감지된 동작: ${gesture}`;
 
           applyGestureToStairRitual(gesture);
         },
@@ -978,8 +983,11 @@
       function applyGestureToStairRitual(gesture) {
         const now = performance.now();
 
-        // idle은 아무 행동도 하지 않는 대기 상태이므로 무시한다.
+        // idle은 대기 상태다. offering을 멈추면 엘리베이터도 현재 위치에서 멈춘다.
         if (gesture === "idle" || gesture === "none") {
+          elevatorSummoning = false;
+          target = progress;
+          ritualMessage = "몸짓이 멈췄다. 엘리베이터도 현재 위치에서 멈춘다.";
           return;
         }
 
@@ -1006,7 +1014,9 @@
         }
 
         if (gesture === "offering") {
-          // offering이 감지되면 즉시 엘리베이터 호출 성공
+          // offering이 유지되는 동안에만 엘리베이터를 위로 호출한다.
+          elevatorSummoning = true;
+
           stairSatisfaction = 100;
           stairBoredom = 0;
           signalBoostFromRitual = 1;
@@ -1014,11 +1024,8 @@
           stairSoundState = "blessed";
           ritualUnlocked = true;
 
-          // 엘리베이터 목표 위치를 최상단으로 보냄
-          target = MAX_APPROACH;
-
           ritualMessage =
-            "두 손의 봉헌이 감지되었다. 엘리베이터가 아래에서 응답하며 올라온다.";
+            "두 손의 봉헌이 유지되는 동안 엘리베이터가 아래에서 올라온다.";
         }
 
         if (gesture === "sway") {
@@ -1268,8 +1275,11 @@
 
         const time = clock.getElapsedTime();
 
-        const ritualPull = ritualUnlocked ? 0.0035 : 0;
-        target = clamp(target + ritualPull, 0.02, MAX_APPROACH);
+        // offering이 감지되어 유지되는 동안에만 목표 위치가 위로 이동한다.
+        // idle이 감지되면 applyGestureToStairRitual()에서 target = progress로 고정되어 멈춘다.
+        if (elevatorSummoning) {
+          target = clamp(target + 0.0045, 0.02, MAX_APPROACH);
+        }
 
         progress += (target - progress) * 0.075;
 

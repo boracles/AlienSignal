@@ -978,6 +978,11 @@
       function applyGestureToStairRitual(gesture) {
         const now = performance.now();
 
+        // idle은 아무 행동도 하지 않는 대기 상태이므로 무시한다.
+        if (gesture === "idle" || gesture === "none") {
+          return;
+        }
+
         if (gestureCooldown[gesture] && now - gestureCooldown[gesture] < 1200) {
           return;
         }
@@ -1001,12 +1006,19 @@
         }
 
         if (gesture === "offering") {
-          stairSatisfaction += 24;
-          stairBoredom -= 22;
-          signalBoostFromRitual += 0.12;
+          // offering이 감지되면 즉시 엘리베이터 호출 성공
+          stairSatisfaction = 100;
+          stairBoredom = 0;
+          signalBoostFromRitual = 1;
+
           stairSoundState = "blessed";
+          ritualUnlocked = true;
+
+          // 엘리베이터 목표 위치를 최상단으로 보냄
+          target = MAX_APPROACH;
+
           ritualMessage =
-            "계단은 두 손을 들어 올린 몸짓을 제물의 봉헌으로 받아들인다.";
+            "두 손의 봉헌이 감지되었다. 엘리베이터가 아래에서 응답하며 올라온다.";
         }
 
         if (gesture === "sway") {

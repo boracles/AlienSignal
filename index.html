@@ -274,7 +274,7 @@
 
     <script type="module">
       import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-      import { createPoseRitualController } from "./js/pose.js";
+      import { createPoseRitualController } from "./js/pose.js?v=4";
 
       const floorText = document.getElementById("floorText");
       const depthProgress = document.getElementById("depthProgress");
@@ -954,8 +954,6 @@
           currentGesture = gesture;
           lastGestureTime = performance.now();
 
-          caption.textContent = `감지된 동작: ${gesture}`;
-
           applyGestureToStairRitual(gesture);
         },
 
@@ -983,21 +981,48 @@
       function applyGestureToStairRitual(gesture) {
         const now = performance.now();
 
+        // Teachable Machine class name 방어: 공백/대소문자 차이를 흡수한다.
+        const normalizedGesture = String(gesture || "")
+          .trim()
+          .toLowerCase();
+
         // idle은 대기 상태다. offering을 멈추면 엘리베이터도 현재 위치에서 멈춘다.
-        if (gesture === "idle" || gesture === "none") {
+        // 이 처리는 cooldown보다 먼저 해야 한다.
+        if (normalizedGesture === "idle" || normalizedGesture === "none") {
           elevatorSummoning = false;
+          ritualUnlocked = false;
           target = progress;
-          ritualMessage = "몸짓이 멈췄다. 엘리베이터도 현재 위치에서 멈춘다.";
+          ritualMessage =
+            "감지된 동작: idle — 몸짓이 멈췄다. 엘리베이터도 현재 위치에서 멈춘다.";
           return;
         }
 
-        if (gestureCooldown[gesture] && now - gestureCooldown[gesture] < 1200) {
+        // offering은 계속 유지되는 동안 매 프레임 호출되어야 하므로 cooldown을 걸지 않는다.
+        // offering이 감지되는 동안에만 animate()에서 target이 위로 이동한다.
+        if (normalizedGesture === "offering") {
+          elevatorSummoning = true;
+          ritualUnlocked = true;
+
+          stairSatisfaction = 100;
+          stairBoredom = 0;
+          signalBoostFromRitual = 1;
+
+          stairSoundState = "blessed";
+          ritualMessage =
+            "감지된 동작: offering — 두 손의 봉헌이 유지되는 동안 엘리베이터가 올라온다.";
           return;
         }
 
-        gestureCooldown[gesture] = now;
+        if (
+          gestureCooldown[normalizedGesture] &&
+          now - gestureCooldown[normalizedGesture] < 1200
+        ) {
+          return;
+        }
 
-        if (gesture === "bow") {
+        gestureCooldown[normalizedGesture] = now;
+
+        if (normalizedGesture === "bow") {
           stairSatisfaction += 18;
           stairBoredom -= 16;
           signalBoostFromRitual += 0.08;
@@ -1005,7 +1030,7 @@
           ritualMessage = "계단은 고개 숙임을 오래된 인사로 받아들인다.";
         }
 
-        if (gesture === "handRaised") {
+        if (normalizedGesture === "handraised") {
           stairSatisfaction += 12;
           stairBoredom -= 10;
           signalBoostFromRitual += 0.05;
@@ -1013,22 +1038,7 @@
           ritualMessage = "계단은 들어 올린 손을 호출 신호로 인식한다.";
         }
 
-        if (gesture === "offering") {
-          // offering이 유지되는 동안에만 엘리베이터를 위로 호출한다.
-          elevatorSummoning = true;
-
-          stairSatisfaction = 100;
-          stairBoredom = 0;
-          signalBoostFromRitual = 1;
-
-          stairSoundState = "blessed";
-          ritualUnlocked = true;
-
-          ritualMessage =
-            "두 손의 봉헌이 유지되는 동안 엘리베이터가 아래에서 올라온다.";
-        }
-
-        if (gesture === "sway") {
+        if (normalizedGesture === "sway") {
           stairSatisfaction += 10;
           stairBoredom -= 12;
           signalBoostFromRitual += 0.04;
@@ -1037,7 +1047,7 @@
             "계단은 좌우로 흔들리는 몸을 오래된 춤의 신호로 받아들인다.";
         }
 
-        if (gesture === "stillness") {
+        if (normalizedGesture === "stillness") {
           stairSatisfaction += 4;
           stairBoredom -= 3;
           signalBoostFromRitual += 0.015;
@@ -1048,11 +1058,6 @@
         stairSatisfaction = clamp(stairSatisfaction, 0, 100);
         stairBoredom = clamp(stairBoredom, 0, 100);
         signalBoostFromRitual = clamp(signalBoostFromRitual, 0, 1);
-
-        if (stairSatisfaction >= 70 && stairBoredom <= 35) {
-          ritualUnlocked = true;
-          ritualMessage = "계단이 충분히 달래졌다. 엘리베이터가 응답한다.";
-        }
       }
 
       const captions = [
@@ -1278,7 +1283,7 @@
         // offering이 감지되어 유지되는 동안에만 목표 위치가 위로 이동한다.
         // idle이 감지되면 applyGestureToStairRitual()에서 target = progress로 고정되어 멈춘다.
         if (elevatorSummoning) {
-          target = clamp(target + 0.0045, 0.02, MAX_APPROACH);
+          target = clamp(target + 0.012, 0.02, MAX_APPROACH);
         }
 
         progress += (target - progress) * 0.075;

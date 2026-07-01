@@ -1,0 +1,1232 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>108 Steps — Elevator Approaching From Below</title>
+
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #05070a;
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Noto Sans KR",
+          sans-serif;
+        cursor: grab;
+      }
+
+      body:active {
+        cursor: grabbing;
+      }
+
+      canvas {
+        display: block;
+      }
+
+      .hud {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        color: white;
+        z-index: 10;
+      }
+
+      .top-label {
+        position: absolute;
+        top: 24px;
+        left: 28px;
+        right: 28px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        letter-spacing: 0.16em;
+        color: rgba(220, 255, 248, 0.86);
+        text-shadow: 0 0 14px rgba(120, 255, 230, 0.7);
+      }
+
+      .instruction {
+        position: fixed;
+        left: 50%;
+        top: 74px;
+        transform: translateX(-50%);
+        z-index: 12;
+        color: rgba(235, 255, 252, 0.78);
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-shadow: 0 0 12px rgba(120, 255, 230, 0.45);
+        pointer-events: none;
+      }
+
+      .caption {
+        position: absolute;
+        left: 50%;
+        bottom: 34px;
+        width: min(760px, calc(100vw - 48px));
+        transform: translateX(-50%);
+        padding: 14px 18px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 18px;
+        background: rgba(3, 6, 12, 0.46);
+        backdrop-filter: blur(12px);
+        color: rgba(255, 255, 255, 0.88);
+        font-size: 15px;
+        line-height: 1.65;
+        text-align: center;
+        text-shadow: 0 2px 18px rgba(0, 0, 0, 0.7);
+      }
+
+      .reticle {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 44px;
+        height: 44px;
+        transform: translate(-50%, -50%);
+        border: 1px solid rgba(210, 255, 248, 0.36);
+        border-radius: 50%;
+        box-shadow: 0 0 18px rgba(120, 255, 230, 0.3);
+      }
+
+      .reticle::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 5px;
+        height: 5px;
+        transform: translate(-50%, -50%);
+        border-radius: 50%;
+        background: rgba(210, 255, 248, 0.9);
+        box-shadow: 0 0 18px rgba(120, 255, 230, 0.9);
+      }
+
+      .depth {
+        position: absolute;
+        left: 28px;
+        top: 50%;
+        width: 4px;
+        height: 34vh;
+        transform: translateY(-50%);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.18);
+        overflow: hidden;
+      }
+
+      .depth span {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        height: 50%;
+        background: rgba(150, 255, 235, 0.95);
+        box-shadow: 0 0 22px rgba(120, 255, 230, 0.9);
+      }
+
+      .sound-button {
+        position: fixed;
+        right: 28px;
+        bottom: 28px;
+        z-index: 20;
+        border: 1px solid rgba(255, 255, 255, 0.32);
+        border-radius: 999px;
+        padding: 10px 16px;
+        color: #f5ffff;
+        background: rgba(4, 8, 14, 0.5);
+        backdrop-filter: blur(10px);
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        pointer-events: auto;
+      }
+
+      .sound-button.active {
+        background: rgba(130, 255, 232, 0.22);
+        box-shadow: 0 0 22px rgba(120, 255, 230, 0.32);
+      }
+
+      .vignette {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 9;
+        background: radial-gradient(
+          circle at 50% 50%,
+          transparent 44%,
+          rgba(0, 0, 0, 0.28) 76%,
+          rgba(0, 0, 0, 0.86) 100%
+        );
+      }
+
+      .scanline {
+        position: fixed;
+        inset: 0;
+        z-index: 8;
+        pointer-events: none;
+        opacity: 0.11;
+        mix-blend-mode: overlay;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(255, 255, 255, 0.18) 0px,
+          rgba(255, 255, 255, 0.18) 1px,
+          transparent 1px,
+          transparent 5px
+        );
+      }
+
+      .grain {
+        position: fixed;
+        inset: 0;
+        z-index: 7;
+        pointer-events: none;
+        opacity: 0.08;
+        mix-blend-mode: overlay;
+        background-image: repeating-radial-gradient(
+          circle at 30% 40%,
+          rgba(255, 255, 255, 0.9) 0,
+          rgba(255, 255, 255, 0.9) 1px,
+          transparent 1px,
+          transparent 7px
+        );
+        animation: grainMove 0.18s infinite alternate;
+      }
+
+      @keyframes grainMove {
+        from {
+          transform: translate(0, 0);
+        }
+        to {
+          transform: translate(2px, -2px);
+        }
+      }
+
+      @media (max-width: 760px) {
+        .top-label {
+          left: 18px;
+          right: 18px;
+          top: 18px;
+          font-size: 10px;
+          gap: 16px;
+        }
+
+        .instruction {
+          top: 58px;
+          font-size: 11px;
+        }
+
+        .caption {
+          bottom: 24px;
+          width: calc(100vw - 36px);
+          font-size: 13px;
+        }
+
+        .depth {
+          left: 18px;
+        }
+
+        .sound-button {
+          right: 18px;
+          bottom: 18px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="hud">
+      <div class="top-label">
+        <span>HAEBANGCHON 108 STEPS / VIEW FROM THE UPPER STAIRS</span>
+        <span id="floorText">1F</span>
+      </div>
+
+      <div class="instruction">
+        drag up / down until the elevator reaches your feet
+      </div>
+
+      <div class="reticle"></div>
+
+      <div class="depth">
+        <span id="depthProgress"></span>
+      </div>
+
+      <div class="caption" id="caption">
+        나는 이미 계단 위에 서 있고, 아래에서 엘리베이터가 나를 향해 올라온다.
+      </div>
+    </div>
+
+    <button class="sound-button" id="soundButton">sound on</button>
+    <div class="grain"></div>
+    <div class="scanline"></div>
+    <div class="vignette"></div>
+
+    <script type="module">
+      import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+
+      const floorText = document.getElementById("floorText");
+      const depthProgress = document.getElementById("depthProgress");
+      const caption = document.getElementById("caption");
+      const soundButton = document.getElementById("soundButton");
+
+      // ------------------------------------------------------------
+      // Scene / Camera / Renderer
+      // ------------------------------------------------------------
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xbfd4dd);
+      scene.fog = new THREE.Fog(0xbfd4dd, 18, 88);
+
+      const camera = new THREE.PerspectiveCamera(
+        78,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        150,
+      );
+
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: false,
+      });
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      document.body.appendChild(renderer.domElement);
+
+      // ------------------------------------------------------------
+      // Materials
+      // ------------------------------------------------------------
+      const matConcrete = new THREE.MeshStandardMaterial({
+        color: 0x8b8378,
+        roughness: 0.94,
+        metalness: 0.02,
+      });
+
+      const matConcreteDark = new THREE.MeshStandardMaterial({
+        color: 0x55534f,
+        roughness: 0.98,
+        metalness: 0.01,
+      });
+
+      const matWallRight = new THREE.MeshStandardMaterial({
+        color: 0xd8d8cf,
+        roughness: 0.62,
+        metalness: 0.08,
+      });
+
+      const matWallLeft = new THREE.MeshStandardMaterial({
+        color: 0x9fcbd4,
+        roughness: 0.84,
+        metalness: 0.02,
+      });
+
+      const matOldWall = new THREE.MeshStandardMaterial({
+        color: 0xb8b2a7,
+        roughness: 0.95,
+        metalness: 0.01,
+      });
+
+      const matBrick = new THREE.MeshStandardMaterial({
+        color: 0x9b5542,
+        roughness: 0.82,
+        metalness: 0.01,
+      });
+
+      const matMetal = new THREE.MeshStandardMaterial({
+        color: 0xb8bbb7,
+        roughness: 0.28,
+        metalness: 0.72,
+      });
+
+      const matDarkMetal = new THREE.MeshStandardMaterial({
+        color: 0x1a1c1f,
+        roughness: 0.32,
+        metalness: 0.82,
+      });
+
+      const matBlack = new THREE.MeshStandardMaterial({
+        color: 0x101114,
+        roughness: 0.7,
+        metalness: 0.12,
+      });
+
+      const matGlass = new THREE.MeshPhysicalMaterial({
+        color: 0xd9ffff,
+        roughness: 0.04,
+        metalness: 0.02,
+        transparent: true,
+        opacity: 0.18,
+        transmission: 0.52,
+        thickness: 0.05,
+        side: THREE.DoubleSide,
+      });
+
+      const matSignalBase = new THREE.MeshBasicMaterial({
+        color: 0x84ffe8,
+        transparent: true,
+        opacity: 0.38,
+        side: THREE.DoubleSide,
+      });
+
+      const matWhiteLight = new THREE.MeshBasicMaterial({
+        color: 0xeaffff,
+      });
+
+      const matCabinFloor = new THREE.MeshStandardMaterial({
+        color: 0x24282c,
+        roughness: 0.72,
+        metalness: 0.18,
+      });
+
+      // ------------------------------------------------------------
+      // Lights
+      // ------------------------------------------------------------
+      const hemi = new THREE.HemisphereLight(0xeaf7ff, 0x3a332f, 2.1);
+      scene.add(hemi);
+
+      const sun = new THREE.DirectionalLight(0xffffff, 2.5);
+      sun.position.set(-8, 18, 8);
+      sun.castShadow = true;
+      sun.shadow.mapSize.width = 2048;
+      sun.shadow.mapSize.height = 2048;
+      sun.shadow.camera.left = -36;
+      sun.shadow.camera.right = 36;
+      sun.shadow.camera.top = 36;
+      sun.shadow.camera.bottom = -36;
+      scene.add(sun);
+
+      const alienLight = new THREE.PointLight(0x80ffe8, 2.2, 30);
+      alienLight.position.set(0, 5, -10);
+      scene.add(alienLight);
+
+      const lowerWarmLight = new THREE.PointLight(0xffe3b2, 0.9, 22);
+      lowerWarmLight.position.set(-4, 3, 3);
+      scene.add(lowerWarmLight);
+
+      // ------------------------------------------------------------
+      // World constants
+      // ------------------------------------------------------------
+      const WORLD_LENGTH = 78;
+      const STEP_COUNT = 108;
+      const stepDepth = WORLD_LENGTH / STEP_COUNT;
+      const stepHeight = 0.105;
+      const stairWidth = 4.7;
+      const inclineAngle = Math.atan2(stepHeight, stepDepth);
+
+      const inclineGroup = new THREE.Group();
+      scene.add(inclineGroup);
+
+      // ------------------------------------------------------------
+      // 3D stairs on both sides
+      // ------------------------------------------------------------
+      const stairGeo = new THREE.BoxGeometry(
+        stairWidth,
+        stepHeight,
+        stepDepth * 0.94,
+      );
+
+      for (let i = 0; i < STEP_COUNT; i++) {
+        const z = -i * stepDepth;
+        const y = i * stepHeight;
+
+        const leftStep = new THREE.Mesh(stairGeo, matConcrete);
+        leftStep.position.set(-3.65, y, z);
+        leftStep.castShadow = true;
+        leftStep.receiveShadow = true;
+        inclineGroup.add(leftStep);
+
+        const rightStep = new THREE.Mesh(stairGeo, matConcrete);
+        rightStep.position.set(3.65, y, z);
+        rightStep.castShadow = true;
+        rightStep.receiveShadow = true;
+        inclineGroup.add(rightStep);
+
+        if (i % 2 === 0) {
+          const wearGeo = new THREE.BoxGeometry(
+            stairWidth * 0.95,
+            0.014,
+            0.028,
+          );
+
+          const wearL = new THREE.Mesh(wearGeo, matConcreteDark);
+          wearL.position.set(
+            -3.65,
+            y + stepHeight / 2 + 0.012,
+            z + stepDepth * 0.42,
+          );
+          inclineGroup.add(wearL);
+
+          const wearR = new THREE.Mesh(wearGeo, matConcreteDark);
+          wearR.position.set(
+            3.65,
+            y + stepHeight / 2 + 0.012,
+            z + stepDepth * 0.42,
+          );
+          inclineGroup.add(wearR);
+        }
+
+        if (i % 7 === 0) {
+          const stainGeo = new THREE.BoxGeometry(
+            0.6 + Math.random() * 1.2,
+            0.016,
+            0.09,
+          );
+          const stainMat = new THREE.MeshStandardMaterial({
+            color: 0x3e3d38,
+            roughness: 1,
+            transparent: true,
+            opacity: 0.42,
+          });
+
+          const stainL = new THREE.Mesh(stainGeo, stainMat);
+          stainL.position.set(
+            -3.65 + (Math.random() - 0.5) * 2.0,
+            y + stepHeight / 2 + 0.02,
+            z,
+          );
+          inclineGroup.add(stainL);
+
+          const stainR = new THREE.Mesh(stainGeo, stainMat);
+          stainR.position.set(
+            3.65 + (Math.random() - 0.5) * 2.0,
+            y + stepHeight / 2 + 0.02,
+            z,
+          );
+          inclineGroup.add(stainR);
+        }
+      }
+
+      // ------------------------------------------------------------
+      // Central elevator rail bed
+      // ------------------------------------------------------------
+      const railBed = new THREE.Mesh(
+        new THREE.BoxGeometry(2.1, 0.12, WORLD_LENGTH + 6),
+        new THREE.MeshStandardMaterial({
+          color: 0xc9cec9,
+          roughness: 0.6,
+          metalness: 0.12,
+        }),
+      );
+      railBed.position.set(0, 4.2, -WORLD_LENGTH / 2 + 1.8);
+      railBed.rotation.x = inclineAngle;
+      railBed.receiveShadow = true;
+      railBed.castShadow = true;
+      inclineGroup.add(railBed);
+
+      function makeRail(x) {
+        const geo = new THREE.CylinderGeometry(
+          0.035,
+          0.035,
+          WORLD_LENGTH + 8,
+          16,
+        );
+        const rail = new THREE.Mesh(geo, matMetal);
+        rail.position.set(x, 4.35, -WORLD_LENGTH / 2 + 1.6);
+        rail.rotation.x = Math.PI / 2 + inclineAngle;
+        rail.castShadow = true;
+        inclineGroup.add(rail);
+      }
+
+      makeRail(-0.64);
+      makeRail(0.64);
+
+      // ------------------------------------------------------------
+      // Right elevator structure / wall
+      // ------------------------------------------------------------
+      const rightWall = new THREE.Mesh(
+        new THREE.BoxGeometry(0.55, 10, WORLD_LENGTH + 8),
+        matWallRight,
+      );
+      rightWall.position.set(6.25, 5, -WORLD_LENGTH / 2 + 1);
+      rightWall.castShadow = true;
+      rightWall.receiveShadow = true;
+      inclineGroup.add(rightWall);
+
+      for (let i = 0; i < 22; i++) {
+        const ridge = new THREE.Mesh(
+          new THREE.BoxGeometry(0.09, 9.8, 0.055),
+          matMetal,
+        );
+        ridge.position.set(5.94, 5.1, -i * 3.7 + 2.2);
+        ridge.castShadow = true;
+        inclineGroup.add(ridge);
+      }
+
+      function makeLongCylinder(x, y, z, length, radius, material) {
+        const geo = new THREE.CylinderGeometry(radius, radius, length, 16);
+        const mesh = new THREE.Mesh(geo, material);
+        mesh.position.set(x, y, z);
+        mesh.rotation.x = Math.PI / 2 + inclineAngle;
+        mesh.castShadow = true;
+        inclineGroup.add(mesh);
+        return mesh;
+      }
+
+      makeLongCylinder(
+        5.45,
+        3.0,
+        -WORLD_LENGTH / 2 + 1,
+        WORLD_LENGTH + 4,
+        0.055,
+        matMetal,
+      );
+      makeLongCylinder(
+        5.15,
+        4.1,
+        -WORLD_LENGTH / 2 + 1,
+        WORLD_LENGTH + 4,
+        0.04,
+        matMetal,
+      );
+
+      // ------------------------------------------------------------
+      // Left alley wall
+      // ------------------------------------------------------------
+      const leftWall = new THREE.Mesh(
+        new THREE.BoxGeometry(0.45, 4.4, WORLD_LENGTH + 8),
+        matWallLeft,
+      );
+      leftWall.position.set(-6.25, 2.1, -WORLD_LENGTH / 2 + 1);
+      leftWall.castShadow = true;
+      leftWall.receiveShadow = true;
+      inclineGroup.add(leftWall);
+
+      const leftBase = new THREE.Mesh(
+        new THREE.BoxGeometry(0.8, 1.5, WORLD_LENGTH + 8),
+        matOldWall,
+      );
+      leftBase.position.set(-5.8, 0.75, -WORLD_LENGTH / 2 + 1);
+      leftBase.castShadow = true;
+      leftBase.receiveShadow = true;
+      inclineGroup.add(leftBase);
+
+      for (let i = 0; i < 11; i++) {
+        const panel = new THREE.Mesh(
+          new THREE.PlaneGeometry(
+            1.2 + Math.random() * 1.6,
+            0.55 + Math.random() * 0.5,
+          ),
+          new THREE.MeshStandardMaterial({
+            color: i % 2 ? 0xe8f5f2 : 0x83c5d6,
+            roughness: 0.9,
+            transparent: true,
+            opacity: 0.72,
+            side: THREE.DoubleSide,
+          }),
+        );
+        panel.position.set(-6.485, 2.3 + Math.random() * 1.1, -i * 6.1 + 0.5);
+        panel.rotation.y = Math.PI / 2;
+        inclineGroup.add(panel);
+      }
+
+      makeLongCylinder(
+        -5.25,
+        2.65,
+        -WORLD_LENGTH / 2 + 1,
+        WORLD_LENGTH + 4,
+        0.055,
+        matMetal,
+      );
+
+      function makePosts(x, baseY, gap, count) {
+        for (let i = 0; i < count; i++) {
+          const post = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.035, 0.035, 1.5, 12),
+            matMetal,
+          );
+          const z = -i * gap + 1;
+          const y = baseY + i * stepHeight * (gap / stepDepth);
+          post.position.set(x, y, z);
+          post.castShadow = true;
+          inclineGroup.add(post);
+        }
+      }
+
+      makePosts(-5.25, 1.3, 5.2, 15);
+      makePosts(5.45, 1.6, 5.2, 15);
+
+      // ------------------------------------------------------------
+      // Glass canopy
+      // ------------------------------------------------------------
+      for (let i = 0; i < 10; i++) {
+        const canopy = new THREE.Mesh(
+          new THREE.BoxGeometry(5.4, 0.08, 1.4),
+          matGlass,
+        );
+        canopy.position.set(0, 9.3 + i * 0.08, -i * 5.8 - 4);
+        canopy.rotation.x = -0.22;
+        inclineGroup.add(canopy);
+
+        const canopyFrame = new THREE.Mesh(
+          new THREE.BoxGeometry(5.6, 0.08, 0.08),
+          matMetal,
+        );
+        canopyFrame.position.set(0, 9.25 + i * 0.08, -i * 5.8 - 3.32);
+        canopyFrame.castShadow = true;
+        inclineGroup.add(canopyFrame);
+      }
+
+      // ------------------------------------------------------------
+      // Urban details
+      // ------------------------------------------------------------
+      for (let i = 0; i < 7; i++) {
+        const pole = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.08, 0.1, 8.5, 16),
+          matMetal,
+        );
+        pole.position.set(-7.2, 4.2 + i * 0.22, -i * 10.5 + 1);
+        pole.castShadow = true;
+        inclineGroup.add(pole);
+
+        const buildingMat = i % 2 ? matBrick : matConcreteDark;
+        const building = new THREE.Mesh(
+          new THREE.BoxGeometry(
+            1.7 + Math.random() * 0.7,
+            2.4 + Math.random() * 1.4,
+            2.1 + Math.random() * 0.8,
+          ),
+          buildingMat,
+        );
+        building.position.set(-9.4, 1.4, -i * 12 - 3);
+        building.castShadow = true;
+        building.receiveShadow = true;
+        inclineGroup.add(building);
+      }
+
+      for (let i = 0; i < 6; i++) {
+        const points = [];
+
+        for (let j = 0; j < 42; j++) {
+          const t = j / 41;
+          points.push(
+            new THREE.Vector3(
+              -7.8 + Math.sin(t * Math.PI * 2 + i) * 0.22,
+              7.2 + Math.sin(t * Math.PI + i) * 0.34,
+              -t * WORLD_LENGTH + 2,
+            ),
+          );
+        }
+
+        const wireGeo = new THREE.BufferGeometry().setFromPoints(points);
+        const wire = new THREE.Line(
+          wireGeo,
+          new THREE.LineBasicMaterial({
+            color: 0x202226,
+            transparent: true,
+            opacity: 0.72,
+          }),
+        );
+
+        inclineGroup.add(wire);
+      }
+
+      for (let i = 0; i < 10; i++) {
+        const debris = new THREE.Mesh(
+          new THREE.BoxGeometry(0.25, 0.12, 0.35),
+          new THREE.MeshStandardMaterial({
+            color: i % 2 ? 0xffffff : 0x333333,
+            roughness: 0.8,
+          }),
+        );
+        debris.position.set(
+          -4.6 + Math.random() * 0.7,
+          0.15 + i * stepHeight * 2,
+          -10 - i * 3.4,
+        );
+        debris.rotation.y = Math.random() * Math.PI;
+        debris.castShadow = true;
+        inclineGroup.add(debris);
+      }
+
+      // ------------------------------------------------------------
+      // Alien signal rings
+      // ------------------------------------------------------------
+      const ringGroup = new THREE.Group();
+      scene.add(ringGroup);
+
+      for (let i = 0; i < 7; i++) {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(2.2 + i * 0.85, 0.012, 8, 112),
+          matSignalBase.clone(),
+        );
+        ring.position.set(0, 5.8 + i * 0.15, -57 - i * 1.2);
+        ring.rotation.x = Math.PI / 2;
+        ring.rotation.z = i * 0.4;
+        ringGroup.add(ring);
+      }
+
+      // ------------------------------------------------------------
+      // Real elevator cabin in world space
+      // 카메라는 계단 위에 고정되고, 엘리베이터 캐빈만 아래에서 나를 향해 올라온다.
+      // ------------------------------------------------------------
+      const cabin = new THREE.Group();
+      scene.add(cabin);
+      scene.add(camera);
+
+      function cabinBox(w, h, d, x, y, z, material) {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+        mesh.position.set(x, y, z);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        cabin.add(mesh);
+        return mesh;
+      }
+
+      const cabinWidth = 2.8;
+      const cabinHeight = 2.6;
+      const cabinDepth = 2.6;
+
+      // floor / ceiling
+      cabinBox(cabinWidth, 0.08, cabinDepth, 0, -1.35, 0, matCabinFloor);
+      cabinBox(cabinWidth, 0.08, cabinDepth, 0, 1.25, 0, matDarkMetal);
+
+      // front frame
+      cabinBox(0.08, cabinHeight, 0.08, -1.4, 0, -1.3, matMetal);
+      cabinBox(0.08, cabinHeight, 0.08, 1.4, 0, -1.3, matMetal);
+      cabinBox(cabinWidth, 0.08, 0.08, 0, 1.25, -1.3, matMetal);
+      cabinBox(cabinWidth, 0.08, 0.08, 0, -1.35, -1.3, matMetal);
+      cabinBox(0.045, cabinHeight, 0.06, 0, 0, -1.31, matMetal);
+
+      // front glass
+      const frontGlassLeft = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.28, 2.35),
+        matGlass,
+      );
+      frontGlassLeft.position.set(-0.68, 0, -1.34);
+      cabin.add(frontGlassLeft);
+
+      const frontGlassRight = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.28, 2.35),
+        matGlass,
+      );
+      frontGlassRight.position.set(0.68, 0, -1.34);
+      cabin.add(frontGlassRight);
+
+      // side glass walls + slim metal frames only
+      // 옆면은 막힌 금속판이 아니라, 유리와 얇은 프레임만 남긴다.
+      cabinBox(0.06, 0.06, cabinDepth, -1.4, 1.25, 0, matMetal);
+      cabinBox(0.06, 0.06, cabinDepth, -1.4, -1.35, 0, matMetal);
+      cabinBox(0.06, 0.06, cabinDepth, 1.4, 1.25, 0, matMetal);
+      cabinBox(0.06, 0.06, cabinDepth, 1.4, -1.35, 0, matMetal);
+
+      const leftGlass = new THREE.Mesh(
+        new THREE.PlaneGeometry(cabinDepth, 2.35),
+        matGlass,
+      );
+      leftGlass.position.set(-1.36, 0, 0);
+      leftGlass.rotation.y = Math.PI / 2;
+      cabin.add(leftGlass);
+
+      const rightGlass = new THREE.Mesh(
+        new THREE.PlaneGeometry(cabinDepth, 2.35),
+        matGlass,
+      );
+      rightGlass.position.set(1.36, 0, 0);
+      rightGlass.rotation.y = -Math.PI / 2;
+      cabin.add(rightGlass);
+
+      // back frame, partial
+      cabinBox(0.08, cabinHeight, 0.08, -1.4, 0, 1.3, matMetal);
+      cabinBox(0.08, cabinHeight, 0.08, 1.4, 0, 1.3, matMetal);
+      cabinBox(cabinWidth, 0.08, 0.08, 0, 1.25, 1.3, matMetal);
+      cabinBox(cabinWidth, 0.08, 0.08, 0, -1.35, 1.3, matMetal);
+
+      // handles
+      const frontHandleGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.1, 16);
+
+      const frontHandle = new THREE.Mesh(frontHandleGeo, matMetal);
+      frontHandle.position.set(0, -0.65, -1.12);
+      frontHandle.rotation.z = Math.PI / 2;
+      frontHandle.castShadow = true;
+      cabin.add(frontHandle);
+
+      const leftHandle = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.03, 0.03, 1.7, 16),
+        matMetal,
+      );
+      leftHandle.position.set(-1.22, -0.7, 0);
+      leftHandle.rotation.x = Math.PI / 2;
+      leftHandle.castShadow = true;
+      cabin.add(leftHandle);
+
+      const rightHandle = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.03, 0.03, 1.7, 16),
+        matMetal,
+      );
+      rightHandle.position.set(1.22, -0.7, 0);
+      rightHandle.rotation.x = Math.PI / 2;
+      rightHandle.castShadow = true;
+      cabin.add(rightHandle);
+
+      // cabin light
+      const cabinLightMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2, 0.04, 0.08),
+        matWhiteLight,
+      );
+      cabinLightMesh.position.set(0, 1.18, -0.65);
+      cabin.add(cabinLightMesh);
+
+      const cabinLight = new THREE.PointLight(0xeaffff, 1.5, 5);
+      cabinLight.position.set(0, 1.05, -0.4);
+      cabin.add(cabinLight);
+
+      // reflections
+      const reflectionMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.12,
+        side: THREE.DoubleSide,
+      });
+
+      const reflectionLeft = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.22, 1.8),
+        reflectionMat,
+      );
+      reflectionLeft.position.set(-1.41, 0.0, -0.55);
+      reflectionLeft.rotation.y = Math.PI / 2;
+      reflectionLeft.rotation.z = -0.12;
+      cabin.add(reflectionLeft);
+
+      const reflectionRight = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.22, 1.8),
+        reflectionMat.clone(),
+      );
+      reflectionRight.position.set(1.41, 0.0, -0.55);
+      reflectionRight.rotation.y = -Math.PI / 2;
+      reflectionRight.rotation.z = 0.12;
+      cabin.add(reflectionRight);
+
+      // ------------------------------------------------------------
+      // Movement
+      // ------------------------------------------------------------
+      let progress = 0.02;
+      let target = 0.02;
+      let velocity = 0;
+      let lastY = 0;
+      let isDragging = false;
+
+      const captions = [
+        "나는 이미 108계단의 위쪽에 서 있다. 아래 깊은 곳에서 유리 엘리베이터가 작은 점처럼 보인다.",
+        "드래그하면 엘리베이터가 경사 레일을 타고 나를 향해 천천히 올라오기 시작한다.",
+        "캐빈은 계단 사이의 빈 통로를 따라 접근하고, 양옆의 오래된 계단은 움직이지 않는 관객처럼 남아 있다.",
+        "금속이 끌리는 소리와 유리의 반사는, 멀리 있던 장치가 점점 현재의 몸 앞으로 들어오는 느낌을 만든다.",
+        "엘리베이터는 수직으로 상승하지 않는다. 시간의 단층을 비스듬히 타고 내 쪽으로 접근한다.",
+        "마지막에는 엘리베이터가 계단 위의 내 바로 앞까지 올라와 멈춘다.",
+      ];
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function map(value, inMin, inMax, outMin, outMax) {
+        return outMin + ((value - inMin) * (outMax - outMin)) / (inMax - inMin);
+      }
+
+      function smoothstep(edge0, edge1, value) {
+        const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+        return t * t * (3 - 2 * t);
+      }
+
+      function getPathPosition(t) {
+        const z = map(t, 0, 1, 4, -WORLD_LENGTH + 6);
+        const y = map(t, 0, 1, 1.3, STEP_COUNT * stepHeight + 2.3);
+        const x = 0;
+        return new THREE.Vector3(x, y, z);
+      }
+
+      // 내가 이미 서 있는 계단 위쪽 시점.
+      const viewerBase = getPathPosition(0.992);
+      // 탑승 직전 시점: 계단 위 랜딩의 왼쪽에서 엘리베이터 옆면 출입부를 바라보는 사람 눈높이.
+      // 즉, 정면 승차가 아니라 옆에서 타는 시점으로 맞춘다.
+      const viewerPosition = viewerBase
+        .clone()
+        .add(new THREE.Vector3(-2.35, 0.1, -0.95));
+      const MAX_APPROACH = 0.992;
+
+      function startDrag(y) {
+        isDragging = true;
+        lastY = y;
+        startAudioIfNeeded();
+      }
+
+      function moveDrag(y) {
+        if (!isDragging) return;
+
+        const dy = y - lastY;
+        lastY = y;
+
+        velocity = dy;
+        target = clamp(target - dy * 0.0022, 0.02, MAX_APPROACH);
+      }
+
+      function endDrag() {
+        isDragging = false;
+      }
+
+      window.addEventListener("mousedown", (event) => {
+        startDrag(event.clientY);
+      });
+
+      window.addEventListener("mousemove", (event) => {
+        moveDrag(event.clientY);
+      });
+
+      window.addEventListener("mouseup", endDrag);
+
+      window.addEventListener("touchstart", (event) => {
+        startDrag(event.touches[0].clientY);
+      });
+
+      window.addEventListener("touchmove", (event) => {
+        moveDrag(event.touches[0].clientY);
+      });
+
+      window.addEventListener("touchend", endDrag);
+
+      window.addEventListener(
+        "wheel",
+        (event) => {
+          event.preventDefault();
+          startAudioIfNeeded();
+
+          velocity = event.deltaY * 0.12;
+          target = clamp(target + event.deltaY * 0.0007, 0.02, MAX_APPROACH);
+        },
+        { passive: false },
+      );
+
+      // ------------------------------------------------------------
+      // Audio
+      // ------------------------------------------------------------
+      let soundEnabled = false;
+      let audioContext;
+      let masterGain;
+      let motorOsc;
+      let squeakOsc;
+      let noiseSource;
+      let noiseGain;
+      let bandpass;
+
+      soundButton.addEventListener("click", () => {
+        soundEnabled = !soundEnabled;
+        soundButton.classList.toggle("active", soundEnabled);
+        soundButton.textContent = soundEnabled ? "sound on" : "sound off";
+
+        if (soundEnabled) {
+          startAudioIfNeeded();
+        }
+
+        if (masterGain && audioContext) {
+          masterGain.gain.setTargetAtTime(
+            soundEnabled ? 0.16 : 0,
+            audioContext.currentTime,
+            0.08,
+          );
+        }
+      });
+
+      function createNoiseBuffer(context) {
+        const bufferSize = context.sampleRate * 2;
+        const buffer = context.createBuffer(1, bufferSize, context.sampleRate);
+        const data = buffer.getChannelData(0);
+
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+
+        return buffer;
+      }
+
+      function startAudioIfNeeded() {
+        if (!soundEnabled) return;
+
+        if (!audioContext) {
+          audioContext = new AudioContext();
+
+          masterGain = audioContext.createGain();
+          masterGain.gain.value = 0.16;
+          masterGain.connect(audioContext.destination);
+
+          motorOsc = audioContext.createOscillator();
+          motorOsc.type = "sawtooth";
+          motorOsc.frequency.value = 52;
+
+          const motorGain = audioContext.createGain();
+          motorGain.gain.value = 0.16;
+
+          motorOsc.connect(motorGain);
+          motorGain.connect(masterGain);
+          motorOsc.start();
+
+          bandpass = audioContext.createBiquadFilter();
+          bandpass.type = "bandpass";
+          bandpass.frequency.value = 900;
+          bandpass.Q.value = 12;
+          bandpass.connect(masterGain);
+
+          squeakOsc = audioContext.createOscillator();
+          squeakOsc.type = "triangle";
+          squeakOsc.frequency.value = 760;
+
+          const squeakGain = audioContext.createGain();
+          squeakGain.gain.value = 0.028;
+
+          squeakOsc.connect(squeakGain);
+          squeakGain.connect(bandpass);
+          squeakOsc.start();
+
+          noiseSource = audioContext.createBufferSource();
+          noiseSource.buffer = createNoiseBuffer(audioContext);
+          noiseSource.loop = true;
+
+          noiseGain = audioContext.createGain();
+          noiseGain.gain.value = 0.018;
+
+          noiseSource.connect(noiseGain);
+          noiseGain.connect(bandpass);
+          noiseSource.start();
+        }
+
+        if (audioContext.state === "suspended") {
+          audioContext.resume();
+        }
+      }
+
+      function updateSound(movement) {
+        if (!audioContext || !soundEnabled) return;
+
+        const now = audioContext.currentTime;
+
+        const motorFrequency = map(progress, 0, 1, 45, 92) + movement * 20;
+        const squeakFrequency =
+          map(progress, 0, 1, 520, 1450) +
+          Math.sin(performance.now() * 0.025) * 120 +
+          movement * 380;
+
+        motorOsc.frequency.setTargetAtTime(motorFrequency, now, 0.06);
+        squeakOsc.frequency.setTargetAtTime(squeakFrequency, now, 0.026);
+        bandpass.frequency.setTargetAtTime(600 + movement * 2400, now, 0.04);
+        bandpass.Q.setTargetAtTime(8 + movement * 20, now, 0.04);
+        noiseGain.gain.setTargetAtTime(0.012 + movement * 0.12, now, 0.05);
+        masterGain.gain.setTargetAtTime(
+          soundEnabled ? 0.12 + movement * 0.18 : 0,
+          now,
+          0.08,
+        );
+      }
+
+      // ------------------------------------------------------------
+      // Animation
+      // ------------------------------------------------------------
+      const clock = new THREE.Clock();
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        const time = clock.getElapsedTime();
+
+        progress += (target - progress) * 0.075;
+
+        const movement = clamp(Math.abs(velocity) / 34, 0, 1);
+        const pathPos = getPathPosition(progress);
+
+        // 실제 엘리베이터 캐빈이 공간 안에서 이동한다.
+        // 위치만 경사 레일을 따르고, 캐빈 바닥은 월드 기준 수평을 유지한다.
+        cabin.position.copy(pathPos);
+        cabin.rotation.set(0, 0, 0);
+
+        // 마지막 구간에서는 사용자의 발앞까지 완전히 도킹하듯 조금 더 올라온다.
+        const finalDock = smoothstep(
+          MAX_APPROACH - 0.09,
+          MAX_APPROACH,
+          progress,
+        );
+        cabin.position.y += finalDock * 0.18;
+        cabin.position.z -= finalDock * 1.08;
+
+        // 바닥 수평을 깨지 않도록 roll/pitch 흔들림은 제거한다.
+        // 대신 아주 미세한 상하 진동만 더해 기계적 접근감을 만든다.
+        cabin.position.y += Math.sin(time * 18) * movement * 0.018;
+
+        // 카메라는 계단 위 랜딩에서 탑승을 기다리는 사람 눈 위치로 고정한다.
+        // 캐빈이 거의 다 올라오면 몸은 그대로 두고 고개만 옆으로 더 돌려 바라보는 느낌을 만든다.
+        const headTurn = smoothstep(
+          MAX_APPROACH - 0.08,
+          MAX_APPROACH - 0.006,
+          progress,
+        );
+
+        camera.position.copy(viewerPosition);
+        camera.position.x -= headTurn * 0.03;
+        camera.position.y += Math.sin(time * 1.4) * 0.012;
+
+        // 기본 시선: 아래에서 올라오는 옆면 출입부를 본다.
+        const approachLook = cabin.position.clone();
+        approachLook.x -= 1.08;
+        approachLook.y += 0.04 + Math.sin(time * 23) * movement * 0.012;
+        approachLook.z += 0.08;
+
+        // 최종 시선: 캐빈이 내 옆까지 오면 고개를 옆으로 돌려
+        // 유리 옆면의 중심부가 화면 중앙에 오도록 바라본다.
+        const sideTurnLook = cabin.position.clone();
+        sideTurnLook.x -= 1.34;
+        sideTurnLook.y += 0.08 + Math.sin(time * 23) * movement * 0.008;
+        sideTurnLook.z += 0.02;
+
+        const lookAtCabin = approachLook.lerp(sideTurnLook, headTurn);
+        camera.lookAt(lookAtCabin);
+
+        // 외계 신호는 위로 갈수록 강해짐
+        const signalIntensity = map(progress, 0, 1, 0.15, 1.0);
+        alienLight.intensity = 1.1 + signalIntensity * 3.2;
+        alienLight.position.z = map(progress, 0, 1, -15, -58);
+        alienLight.position.y = map(progress, 0, 1, 3.5, 11.5);
+
+        ringGroup.children.forEach((ring, index) => {
+          ring.rotation.z += 0.002 + index * 0.0008;
+          ring.material.opacity =
+            map(progress, 0, 1, 0.04, 0.44) * (1 - index * 0.06);
+          ring.scale.setScalar(1 + Math.sin(time * 1.7 + index) * 0.025);
+        });
+
+        reflectionLeft.material.opacity = 0.08 + movement * 0.08;
+        reflectionRight.material.opacity = 0.08 + movement * 0.08;
+
+        depthProgress.style.height = `${progress * 100}%`;
+
+        const floor = Math.round(map(progress, 0, MAX_APPROACH, 1, 4));
+        floorText.textContent = `ELEVATOR ${floor}F`;
+
+        const captionIndex = clamp(
+          Math.floor(progress * captions.length),
+          0,
+          captions.length - 1,
+        );
+
+        caption.textContent = captions[captionIndex];
+
+        updateSound(movement);
+
+        velocity *= 0.88;
+
+        renderer.render(scene, camera);
+      }
+
+      animate();
+
+      // ------------------------------------------------------------
+      // Resize
+      // ------------------------------------------------------------
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    </script>
+  </body>
+</html>
